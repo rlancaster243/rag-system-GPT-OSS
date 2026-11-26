@@ -6,8 +6,9 @@ from typing import List, Optional
 import hashlib
 from pathlib import Path
 
-from langchain.vectorstores import Chroma
+from langchain_community.vectorstores import Chroma
 from langchain.schema import Document
+from langchain_core.embeddings import Embeddings
 
 from rag_app.config import CHROMA_PERSIST_DIR, CHROMA_COLLECTION_NAME
 from rag_app.embeddings import get_embeddings
@@ -35,6 +36,7 @@ class VectorStore:
         self,
         persist_directory: Optional[Path] = None,
         collection_name: str = CHROMA_COLLECTION_NAME,
+        embeddings: Optional[Embeddings] = None,
     ):
         """
         Initialize the vector store.
@@ -42,10 +44,11 @@ class VectorStore:
         Args:
             persist_directory: Directory to persist the vector store
             collection_name: Name of the Chroma collection
+            embeddings: Embedding function (defaults to the cached local model)
         """
         self.persist_directory = persist_directory or CHROMA_PERSIST_DIR
         self.collection_name = collection_name
-        self.embeddings = get_embeddings()
+        self.embeddings = embeddings or get_embeddings()
         self._vectorstore = None
 
     def _ensure_vectorstore(self):
@@ -79,7 +82,7 @@ class VectorStore:
 
         # Get existing hashes
         try:
-            existing_docs = self._vectorstore.get()
+            existing_docs = self._vectorstore.get(include=["metadatas"])
             existing_hashes = set()
             if existing_docs and "metadatas" in existing_docs:
                 for metadata in existing_docs["metadatas"]:
@@ -88,14 +91,21 @@ class VectorStore:
         except Exception:
             existing_hashes = set()
 
-        # Filter out duplicates
-        new_documents = [
-            doc for doc in documents
-            if doc.metadata["content_hash"] not in existing_hashes
-        ]
+        # Filter out duplicates, both against the store and within this batch
+        # (identical chunks inside one ingest run used to be indexed twice).
+        new_documents = []
+        for doc in documents:
+            content_hash = doc.metadata["content_hash"]
+            if content_hash in existing_hashes:
+                continue
+            existing_hashes.add(content_hash)
+            new_documents.append(doc)
 
         if new_documents:
-            self._vectorstore.add_documents(new_documents)
+            self._vectorstore.add_documents(
+                new_documents,
+                ids=[doc.metadata["content_hash"] for doc in new_documents],
+            )
             self._vectorstore.persist()
 
         return len(new_documents)
@@ -138,19 +148,19 @@ class VectorStore:
         """
         self._ensure_vectorstore()
         try:
-            result = self._vectorstore.get()
-            if result and "ids" in result:
-                return len(result["ids"])
+            return self._vectorstore._collection.count()
         except Exception:
-            pass
-        return 0
+            return 0
 
 
-def get_vectorstore() -> VectorStore:
+def get_vectorstore(persist_directory: Optional[Path] = None) -> VectorStore:
     """
     Factory function to get the configured vector store.
+
+    Args:
+        persist_directory: Override the default Chroma directory (used by tests/eval)
 
     Returns:
         VectorStore instance
     """
-    return VectorStore()
+    return VectorStore(persist_directory=persist_directory)

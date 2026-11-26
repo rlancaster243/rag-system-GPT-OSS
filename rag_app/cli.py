@@ -56,6 +56,24 @@ def cmd_ask(args):
         return 1
 
 
+def cmd_eval(args):
+    """Evaluate retrieval (and optionally answer quality) on a labelled question set."""
+    from pathlib import Path
+    from rag_app.evaluation import evaluate_rag
+
+    eval_file = Path(args.eval_file)
+    if not eval_file.exists():
+        print(f"❌ Error: eval file not found: {eval_file}")
+        return 1
+    evaluate_rag(
+        eval_file,
+        k=args.k,
+        output_file=Path(args.output) if args.output else None,
+        retrieval_only=args.retrieval_only,
+    )
+    return 0
+
+
 def cmd_serve(args):
     """Start the FastAPI server."""
     import uvicorn
@@ -76,7 +94,7 @@ def cmd_serve(args):
 def main():
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
-        description="RAG System CLI - Retrieval Augmented Generation with Groq and DeepSeek",
+        description="RAG System CLI - Retrieval Augmented Generation with Groq (GPT-OSS 20B)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
@@ -106,6 +124,17 @@ def main():
         help="Number of documents to retrieve (default: 4)"
     )
     parser_ask.set_defaults(func=cmd_ask)
+
+    # Eval command
+    parser_eval = subparsers.add_parser("eval", help="Evaluate the system on a labelled question set")
+    parser_eval.add_argument("eval_file", nargs="?", default="eval/sample_eval.jsonl",
+                             help="JSONL/CSV eval set (default: eval/sample_eval.jsonl)")
+    parser_eval.add_argument("-k", type=int, default=4, help="Documents to retrieve (default: 4)")
+    parser_eval.add_argument("--retrieval-only", action="store_true",
+                             help="Only compute retrieval metrics (no LLM / API key needed)")
+    parser_eval.add_argument("--output", type=str, default=None,
+                             help="Report path (default: reports/eval_summary.json)")
+    parser_eval.set_defaults(func=cmd_eval)
 
     # Serve command
     parser_serve = subparsers.add_parser(

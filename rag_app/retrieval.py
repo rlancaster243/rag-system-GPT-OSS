@@ -1,26 +1,31 @@
 """
 Retrieval module for querying the vector store.
 """
-from typing import List, Dict
+from typing import Dict, List, Optional
 
 from langchain.schema import Document
 
 from rag_app.config import DEFAULT_K
-from rag_app.vectorstore import get_vectorstore
+from rag_app.vectorstore import VectorStore, get_vectorstore
 
 
-def retrieve_documents(query: str, k: int = DEFAULT_K) -> List[Document]:
+def retrieve_documents(
+    query: str,
+    k: int = DEFAULT_K,
+    vectorstore: Optional[VectorStore] = None,
+) -> List[Document]:
     """
     Retrieve relevant documents for a query.
 
     Args:
         query: Query string
         k: Number of documents to retrieve
+        vectorstore: Vector store to query (defaults to the configured persistent store)
 
     Returns:
         List of relevant Document objects
     """
-    vectorstore = get_vectorstore()
+    vectorstore = vectorstore or get_vectorstore()
     retriever = vectorstore.get_retriever(k=k)
     documents = retriever.get_relevant_documents(query)
     return documents

@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This is a sample document to demonstrate the RAG (Retrieval Augmented Generation) system capabilities. The system uses Groq's DeepSeek R1 model combined with local embeddings to provide accurate, source-grounded answers.
+This is a sample document to demonstrate the RAG (Retrieval Augmented Generation) system capabilities. The system uses OpenAI's open-weight GPT-OSS 20B model, served by Groq, combined with local embeddings to provide accurate, source-grounded answers.
 
 ## Key Features
 
@@ -20,13 +20,13 @@ The RAG system can process multiple document types:
 
 The system uses semantic search to find relevant information:
 - Documents are chunked into manageable pieces
-- Each chunk is embedded using the BGE model
+- Each chunk is embedded using the all-MiniLM-L6-v2 sentence-transformers model
 - Queries are matched against embeddings using cosine similarity
 - Top-k most relevant chunks are retrieved
 
 ### 3. Grounded Generation
 
-The DeepSeek R1 model generates answers that:
+The GPT-OSS 20B model generates answers that:
 - Are based solely on retrieved context
 - Include source citations
 - Admit when information is insufficient
@@ -36,11 +36,11 @@ The DeepSeek R1 model generates answers that:
 
 ### Embedding Model
 
-The system uses **BAAI/bge-base-en-v1.5**, which is:
-- A state-of-the-art embedding model
-- Runs completely locally
-- Produces 768-dimensional vectors
-- Optimized for retrieval tasks
+The system uses **sentence-transformers/all-MiniLM-L6-v2**, which is:
+- A compact, widely used embedding model
+- Runs completely locally on CPU
+- Produces 384-dimensional vectors
+- Small enough to fit within Streamlit Community Cloud memory limits
 
 ### Vector Store
 
@@ -53,7 +53,7 @@ The system uses **BAAI/bge-base-en-v1.5**, which is:
 ### LLM Integration
 
 **Groq** provides fast inference for:
-- DeepSeek R1 Distill Llama 70B model
+- The openai/gpt-oss-20b model
 - Low-latency responses
 - Reasoning capabilities
 - Cost-effective API access
@@ -80,4 +80,4 @@ Here are some example questions you can ask:
 
 ## Conclusion
 
-This RAG system provides a powerful, production-ready solution for document-grounded question answering. It combines the best of retrieval and generation to deliver accurate, cited responses.
+This RAG system provides a practical solution for document-grounded question answering. It combines the best of retrieval and generation to deliver accurate, cited responses.

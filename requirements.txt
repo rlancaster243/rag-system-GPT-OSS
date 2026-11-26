@@ -1,15 +1,28 @@
+# Supported Python: 3.10 / 3.11 (chromadb 0.4.x + chroma-hnswlib have no 3.13 wheels).
+# CPU-only PyTorch wheels: ~200 MB instead of ~2.5 GB of CUDA libraries, which is what
+# keeps the app inside Streamlit Community Cloud's memory/disk limits.
+--extra-index-url https://download.pytorch.org/whl/cpu
+
 langchain==0.1.0
+langchain-community==0.0.20
+langchain-core==0.1.23
 langchain-groq==0.0.1
 chromadb==0.4.22
 sentence-transformers==2.3.1
+torch>=2.1.2,<2.6
+transformers==4.37.2
+# chromadb 0.4.22 uses np.float_, which was removed in NumPy 2.0
+numpy>=1.24,<2
+# Streamlit imports pyarrow; pyarrow>=19 hard-requires NumPy 2 and crashed the app at startup
+pyarrow>=14,<19
+# chromadb 0.4.22 calls posthog.capture() with the pre-3.0 signature (log spam otherwise)
+posthog>=2.4,<3
 fastapi==0.109.0
 uvicorn[standard]==0.27.0
 streamlit==1.30.0
 nbformat==5.9.2
 beautifulsoup4==4.12.3
+lxml==5.1.0
 pydantic==2.5.3
 pypdf==4.0.1
 python-dotenv==1.0.1
-lxml==5.1.0
-torch==2.1.2
-transformers==4.37.2

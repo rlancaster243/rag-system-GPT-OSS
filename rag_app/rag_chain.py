@@ -2,7 +2,7 @@
 RAG chain implementation using LangChain.
 Combines retrieval with LLM generation for grounded answering.
 """
-from typing import Dict, List
+from typing import Any, Dict, List
 
 from langchain.prompts import ChatPromptTemplate
 from langchain.schema.runnable import RunnablePassthrough
@@ -63,13 +63,20 @@ def format_documents(docs: List) -> str:
     return "\n---\n".join(formatted)
 
 
-def answer_question(question: str, k: int = DEFAULT_K) -> Dict[str, any]:
+def answer_question(
+    question: str,
+    k: int = DEFAULT_K,
+    vectorstore=None,
+    llm=None,
+) -> Dict[str, Any]:
     """
     Answer a question using RAG.
 
     Args:
         question: Question to answer
         k: Number of documents to retrieve
+        vectorstore: Optional VectorStore override (defaults to the persistent store)
+        llm: Optional LangChain chat model override (defaults to Groq GPT-OSS)
 
     Returns:
         Dictionary containing:
@@ -78,7 +85,7 @@ def answer_question(question: str, k: int = DEFAULT_K) -> Dict[str, any]:
             - retrieved_docs: Number of documents retrieved
     """
     # Retrieve relevant documents
-    documents = retrieve_documents(question, k=k)
+    documents = retrieve_documents(question, k=k, vectorstore=vectorstore)
 
     if not documents:
         return {
@@ -94,7 +101,7 @@ def answer_question(question: str, k: int = DEFAULT_K) -> Dict[str, any]:
     prompt = ChatPromptTemplate.from_template(RAG_PROMPT_TEMPLATE)
 
     # Get LLM
-    llm = get_llm()
+    llm = llm or get_llm()
 
     # Create chain
     chain = (

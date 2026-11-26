@@ -41,7 +41,7 @@ class HealthResponse(BaseModel):
 # Create FastAPI app
 app = FastAPI(
     title="RAG System API",
-    description="Retrieval Augmented Generation API using Groq and DeepSeek R1",
+    description="Retrieval Augmented Generation API using Groq (GPT-OSS 20B)",
     version="1.0.0",
 )
 
@@ -61,7 +61,9 @@ async def health_check():
 
 
 @app.post("/query", response_model=QueryResponse)
-async def query(request: QueryRequest):
+def query(request: QueryRequest):
+    # Sync handler on purpose: retrieval + the Groq call are blocking, so FastAPI runs this
+    # in its threadpool instead of stalling the event loop for every other request.
     """
     Query the RAG system with a question.
 

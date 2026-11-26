@@ -1,7 +1,8 @@
 """
 Embeddings module using local sentence-transformers.
-Provides BGE embeddings without relying on external APIs.
+Provides sentence-transformer embeddings (all-MiniLM-L6-v2 by default) without external APIs.
 """
+from functools import lru_cache
 from typing import List
 from sentence_transformers import SentenceTransformer
 from langchain.embeddings.base import Embeddings
@@ -10,7 +11,7 @@ from rag_app.config import EMBEDDING_MODEL, EMBEDDING_DEVICE
 
 class LocalEmbeddings(Embeddings):
     """
-    Local embeddings using sentence-transformers BGE model.
+    Local embeddings using a sentence-transformers model.
     Implements LangChain's Embeddings interface for compatibility.
     """
 
@@ -60,11 +61,13 @@ class LocalEmbeddings(Embeddings):
         return embedding.tolist()
 
 
-def get_embeddings() -> LocalEmbeddings:
+@lru_cache(maxsize=4)
+def get_embeddings(model_name: str = EMBEDDING_MODEL, device: str = EMBEDDING_DEVICE) -> LocalEmbeddings:
     """
-    Factory function to get the configured embeddings model.
+    Return a process-wide cached embeddings model.
 
-    Returns:
-        LocalEmbeddings instance
+    Loading a SentenceTransformer takes seconds and hundreds of MB of RAM; previously every
+    query (and every evaluation run) loaded a fresh copy. Caching keeps one instance per
+    (model, device) pair.
     """
-    return LocalEmbeddings()
+    return LocalEmbeddings(model_name=model_name, device=device)
