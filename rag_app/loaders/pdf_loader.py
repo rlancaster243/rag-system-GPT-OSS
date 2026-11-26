@@ -5,7 +5,7 @@ Extracts text from PDF files with page-level metadata.
 from typing import List
 from pathlib import Path
 
-from langchain.document_loaders import PyPDFLoader
+from langchain_community.document_loaders import PyPDFLoader
 from langchain.schema import Document
 
 

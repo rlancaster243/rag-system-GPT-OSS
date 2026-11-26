@@ -143,18 +143,14 @@ def main():
                         st.error("GROQ_API_KEY is not configured. Please check your environment variables or Streamlit secrets.")
                         st.stop()
                     
-                    result = answer_question(question, k=k)
+                    result = answer_question(question, k=k, vectorstore=get_cached_vectorstore())
 
                     # Display answer
                     st.subheader("📝 Answer")
-                    st.markdown(
-                        f"""
-                        <div style="padding: 20px; border-radius: 10px; border: 1px solid #00FF00;">
-                        <span style="color: #00FF00;">{result['answer']}</span>
-                        </div>
-                        """,
-                        unsafe_allow_html=True
-                    )
+                    # Green callout rendered as markdown. Interpolating the answer into raw HTML
+                    # with unsafe_allow_html let model/document text inject markup and broke
+                    # rendering of lists and code blocks in answers.
+                    st.success(result["answer"])
 
                     # Display sources
                     if result["sources"]:

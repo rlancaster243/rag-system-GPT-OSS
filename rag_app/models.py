@@ -1,5 +1,5 @@
 """
-LLM module for Groq integration with DeepSeek R1 model.
+LLM module for Groq integration (default model: openai/gpt-oss-20b).
 All LLM calls go through this module.
 """
 from langchain_groq import ChatGroq
@@ -15,12 +15,12 @@ def get_llm(
     Factory function to get the configured Groq LLM.
 
     Args:
-        model: Model identifier (default: deepseek-r1-distill-llama-70b)
+        model: Groq model identifier (default: config.DEFAULT_MODEL)
         temperature: Temperature for generation (default: 0.0 for stability)
         **kwargs: Additional arguments to pass to ChatGroq
 
     Returns:
-        ChatGroq instance configured with DeepSeek R1
+        Configured ChatGroq instance
 
     Raises:
         ValueError: If GROQ_API_KEY is not set

@@ -7,7 +7,7 @@ A complete **Retrieval Augmented Generation (RAG)** system that uses Groq's GPT-
 This project implements a production-ready RAG system with the following features:
 
 - **LLM Provider**: Groq API with GPT-OSS 20B reasoning model
-- **Embeddings**: Local sentence-transformers (BAAI/bge-base-en-v1.5) - no external API required
+- **Embeddings**: Local sentence-transformers (all-MiniLM-L6-v2) - no external API required
 - **Vector Store**: Chroma with persistent storage
 - **Document Support**: PDF, TXT, MD, HTML, Python source files, Jupyter notebooks
 - **Three Interfaces**: Python CLI, FastAPI HTTP server, Streamlit web app
@@ -28,7 +28,7 @@ rag_project/
 ├── rag_app/
 │   ├── __init__.py
 │   ├── config.py              # Configuration and environment variables
-│   ├── embeddings.py          # Local BGE embeddings
+│   ├── embeddings.py          # Local sentence-transformer embeddings (cached)
 │   ├── models.py              # Groq LLM integration
 │   ├── vectorstore.py         # Chroma vector store with deduplication
 │   ├── retrieval.py           # Document retrieval logic
@@ -36,7 +36,7 @@ rag_project/
 │   ├── ingest.py              # Document ingestion orchestration
 │   ├── cli.py                 # Command-line interface
 │   ├── api.py                 # FastAPI server
-│   ├── evaluation.py          # Evaluation utilities
+│   ├── evaluation.py          # Retrieval + answer-quality metrics
 │   └── loaders/
 │       ├── __init__.py
 │       ├── pdf_loader.py      # PDF document loader
@@ -48,10 +48,13 @@ rag_project/
 │   └── .gitkeep
 ├── notebooks/
 │   └── 01_manual_tests.ipynb  # Manual testing notebook
-├── tests/
-│   └── test_basic_pipeline.py # Basic unit tests
+├── eval/
+│   └── sample_eval.jsonl      # Labelled eval questions for the sample document
+├── tests/                     # 28 offline tests (conftest: fake embedder + fake LLM)
+├── .github/workflows/ci.yml   # Tests + retrieval eval on every push/PR
 ├── streamlit_app.py           # Streamlit web interface
-├── requirements.txt           # Python dependencies
+├── requirements.txt           # Python dependencies (CPU torch, NumPy<2 pins)
+├── requirements-dev.txt       # Test dependencies
 ├── .env.example               # Environment variable template
 ├── .gitignore                 # Git ignore rules
 ├── LICENSE                    # MIT License
@@ -62,7 +65,7 @@ rag_project/
 
 ### Prerequisites
 
-- Python 3.11+
+- Python 3.11 (3.10 also works; chromadb 0.4.x has no wheels for 3.13 — on Streamlit Community Cloud pick 3.11 under *Advanced settings*)
 - Groq API key ([get one here](https://console.groq.com/keys))
 
 ### Installation
@@ -81,7 +84,8 @@ rag_project/
 
 3. **Install dependencies**:
    ```bash
-   pip install -r requirements.txt
+   pip install -r requirements.txt            # pulls CPU-only torch (~200 MB, no CUDA)
+   pip install -r requirements-dev.txt        # pytest + httpx, for running the tests
    ```
 
 4. **Configure environment variables**:
@@ -174,28 +178,45 @@ Features:
 
 ### Evaluation
 
-Evaluate the RAG system on a set of questions:
+`eval/sample_eval.jsonl` holds 8 labelled questions about `data/sample_document.md`. Each item
+lists the expected source file, keywords a relevant chunk must contain, a reference answer and
+keywords the answer should mention.
 
-1. Create an evaluation file (`eval.csv`):
-   ```csv
-   question,expected_answer
-   "What is RAG?","Retrieval Augmented Generation is a technique..."
-   "How does it work?","It combines retrieval with generation..."
-   ```
+```bash
+python -m rag_app.cli ingest
+python -m rag_app.cli eval --retrieval-only     # no API key needed
+python -m rag_app.cli eval                      # + answer quality, needs GROQ_API_KEY
+```
 
-2. Run evaluation:
-   ```bash
-   python -m rag_app.evaluation eval.csv
-   ```
+| Metric | What it measures | Needs LLM |
+|---|---|---|
+| `hit_rate@k` | share of questions with a relevant chunk in the top-k | no |
+| `MRR` | mean reciprocal rank of the first relevant chunk | no |
+| `precision@k` | share of retrieved chunks that are relevant | no |
+| `average_similarity` | cosine similarity of generated vs. reference answer embeddings | yes |
+| `average_keyword_recall` | share of expected answer keywords present in the answer | yes |
+| `source_coverage` | share of answers returned with at least one source | yes |
 
-Results are saved to `reports/eval_summary.json`.
+Failed LLM calls are counted in `num_errors` and kept out of the averages. The report goes to
+`reports/eval_summary.json`.
+
+**Retrieval baseline** (k=4, default config, both bundled files indexed: the sample document plus
+the 254-page security-engineering PDF, 956 chunks): **hit_rate@4 = 0.875, MRR = 0.792,
+precision@4 = 0.250**. The one miss ("What are the main use cases?") is crowded out by chunks
+from the PDF. precision@k is strict by design: a chunk only counts if it contains one of the
+labelled keywords. Answer-quality metrics have not been recorded yet because they need a Groq key.
 
 ### Testing
 
-Run unit tests:
 ```bash
-pytest tests/test_basic_pipeline.py -v
+pytest -q
 ```
+
+28 offline tests: loaders, chunking, vector-store dedup (including duplicates within one batch)
+and persistence, retrieval ranking, the RAG chain with an injected fake LLM, FastAPI endpoints,
+and every evaluation metric. A hashing embedder and a fake chat model replace the real ones, so
+the tests need no model download and no API key. GitHub Actions (`.github/workflows/ci.yml`)
+runs the tests and then the retrieval eval on the bundled corpus on every push and PR.
 
 Use the Jupyter notebook for interactive testing:
 ```bash
@@ -282,15 +303,15 @@ Before pushing to GitHub:
   - Reasoning-optimized model
   - Temperature set to 0.0 for stable outputs
   
-- **Embeddings**: `BAAI/bge-base-en-v1.5`
-  - 768-dimensional embeddings
+- **Embeddings**: `sentence-transformers/all-MiniLM-L6-v2`
+  - 384-dimensional embeddings, loaded once per process (cached)
   - Runs locally via sentence-transformers
   - No external API calls
 
 ### Chunking Strategy
 
-- **Chunk size**: 1000 characters (configurable)
-- **Overlap**: 200 characters (configurable)
+- **Chunk size**: 500 characters (configurable)
+- **Overlap**: 50 characters (configurable)
 - **Splitter**: Recursive character text splitter
 - **Separators**: Prioritizes paragraph and sentence boundaries
 
@@ -309,7 +330,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Acknowledgments
 
 - **Groq** for fast LLM inference
-- **DeepSeek** for the reasoning model
+- **OpenAI** for the open-weight GPT-OSS model
 - **LangChain** for RAG orchestration
 - **Chroma** for vector storage
 - **Sentence Transformers** for local embeddings

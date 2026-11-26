@@ -18,7 +18,7 @@ The system is built with a carefully selected technology stack that balances per
 
 **LLM Provider**: Groq API provides ultra-fast inference for the GPT-OSS 20B model, a reasoning-optimized language model that excels at grounded question answering.
 
-**Embeddings**: The BAAI/bge-base-en-v1.5 model from sentence-transformers runs completely locally, eliminating external API dependencies and costs for embedding generation. This 768-dimensional embedding model is specifically optimized for retrieval tasks.
+**Embeddings**: The sentence-transformers/all-MiniLM-L6-v2 model runs completely locally, eliminating external API dependencies and costs for embedding generation. It produces 384-dimensional embeddings and is small enough for Streamlit Community Cloud's memory limits.
 
 **Vector Database**: Chroma provides persistent vector storage with efficient similarity search, automatic deduplication, and metadata filtering. The database is stored locally in the `chroma_store/` directory.
 
@@ -32,11 +32,11 @@ The system is built with a carefully selected technology stack that balances per
 
 The ingestion pipeline follows a systematic approach to process diverse document types. Documents are first discovered recursively in the `data/` directory, with support for PDF, text, Markdown, HTML, Python source files, and Jupyter notebooks. Each file type has a dedicated loader that extracts content while preserving important metadata such as page numbers, cell indices, and document structure.
 
-After loading, documents are chunked using a recursive character text splitter with configurable chunk size (1000 characters) and overlap (200 characters). This chunking strategy ensures that semantic context is preserved across chunk boundaries. Each chunk is then embedded using the local BGE model, and the resulting vectors are stored in Chroma with automatic deduplication based on content hashing.
+After loading, documents are chunked using a recursive character text splitter with configurable chunk size (500 characters) and overlap (50 characters). This chunking strategy ensures that semantic context is preserved across chunk boundaries. Each chunk is then embedded using the local MiniLM model, and the resulting vectors are stored in Chroma with automatic deduplication based on content hashing.
 
 ### Query Processing Pipeline
 
-When a user submits a query, the system first embeds the question using the same BGE model to ensure semantic consistency. The embedded query is then matched against the vector store using cosine similarity to retrieve the top-k most relevant document chunks (default k=4).
+When a user submits a query, the system first embeds the question using the same embedding model to ensure semantic consistency. The embedded query is then matched against the vector store using cosine similarity to retrieve the top-k most relevant document chunks (default k=4).
 
 The retrieved chunks are formatted into a structured context that includes source information, file types, and location metadata. This context is combined with the user's question in a carefully engineered prompt that instructs the GPT-OSS 20B model to provide answers based solely on the retrieved evidence, cite sources explicitly, and admit when information is insufficient.
 
@@ -213,7 +213,7 @@ The modular architecture makes it straightforward to swap components:
 
 ### Embedding Generation
 
-Embeddings are generated locally on CPU by default. For faster processing, users with NVIDIA GPUs can set `EMBEDDING_DEVICE = "cuda"` in `config.py`. The BGE model is relatively lightweight and performs well even on CPU for moderate document volumes.
+Embeddings are generated locally on CPU by default. For faster processing, users with NVIDIA GPUs can set `EMBEDDING_DEVICE = "cuda"` in `config.py`. The MiniLM model is lightweight and performs well even on CPU for moderate document volumes.
 
 ### Vector Search
 
